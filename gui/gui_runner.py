@@ -1,75 +1,49 @@
 import tkinter as tk
-from tkinter import filedialog, scrolledtext, font
+from tkinter import filedialog, scrolledtext
 import threading
-from parser.parse_990 import run_990_parser  # Your parser function
+from parser.parse_990 import run_990_parser
 
 class GUI:
     def __init__(self, master):
         self.master = master
         master.title("Form 990 Parser")
-        master.configure(bg="#f2f2f2")  # Light gray background
         master.geometry("700x500")
         master.resizable(False, False)
 
-        # Fonts
-        btn_font = font.Font(family="Arial", size=12, weight="bold")
-        log_font = font.Font(family="Courier", size=10)
+        # Container frame (lets OS theme shine)
+        container = tk.Frame(master)
+        container.pack(padx=20, pady=20, fill="both", expand=True)
 
         # Buttons
         self.btn_browse = tk.Button(
-            master,
+            container,
             text="Browse CSV",
-            command=self.browse_csv,
-            font=btn_font,
-            bg="#4a90e2",
-            fg="white",
-            activebackground="#357ABD",
-            relief="flat",
-            padx=10,
-            pady=5
+            command=self.browse_csv
         )
-        self.btn_browse.pack(pady=(15, 5))
+        self.btn_browse.pack(pady=5)
 
         self.btn_select_folder = tk.Button(
-            master,
+            container,
             text="Select Destination Folder",
-            command=self.select_folder,
-            font=btn_font,
-            bg="#4a90e2",
-            fg="white",
-            activebackground="#357ABD",
-            relief="flat",
-            padx=10,
-            pady=5
+            command=self.select_folder
         )
         self.btn_select_folder.pack(pady=5)
 
         self.btn_run = tk.Button(
-            master,
+            container,
             text="Run Parser",
-            command=self.run_parser_thread,
-            font=btn_font,
-            bg="#4a90e2",
-            fg="white",
-            activebackground="#357ABD",
-            relief="flat",
-            padx=10,
-            pady=5
+            command=self.run_parser_thread
         )
         self.btn_run.pack(pady=(5, 15))
 
         # Log box
         self.log = scrolledtext.ScrolledText(
-            master,
+            container,
             width=80,
             height=15,
-            font=log_font,
-            bg="white",
-            fg="#333333",
-            insertbackground="#333333",
             state='disabled'
         )
-        self.log.pack(pady=10)
+        self.log.pack(fill="both", expand=True)
 
         # Initialize paths
         self.source_csv = ""
@@ -91,23 +65,18 @@ class GUI:
             self.log_message(f"Selected destination folder: {folder_path}")
 
     def run_parser_thread(self):
-        # Run parser in separate thread to avoid freezing GUI
         if not self.source_csv or not self.results_dir:
             self.log_message("Please select CSV and destination folder first.")
             return
-        t = threading.Thread(target=self.run_parser, daemon=True)
-        t.start()
+        threading.Thread(target=self.run_parser, daemon=True).start()
 
     def run_parser(self):
         self.log_message("Starting parser...")
         try:
             outputs = run_990_parser(self.source_csv, self.results_dir)
             self.log_message("Parsing complete!")
-            self.log_message(f"People CSV: {outputs['people_csv']}")
-            self.log_message(f"Orgs CSV: {outputs['orgs_csv']}")
-            self.log_message(f"Financial CSV: {outputs['financial_csv']}")
-            self.log_message(f"Financial Changes CSV: {outputs['financial_changes_csv']}")
-            self.log_message(f"HTML Summary: {outputs['html_summary']}")
+            for k, v in outputs.items():
+                self.log_message(f"{k}: {v}")
         except Exception as e:
             self.log_message(f"Error: {str(e)}")
 
@@ -121,8 +90,7 @@ class GUI:
         self.log.see(tk.END)
         self.log.configure(state='disabled')
 
-# --- Run GUI ---
 if __name__ == "__main__":
     root = tk.Tk()
-    gui = GUI(root)
+    GUI(root)
     root.mainloop()
