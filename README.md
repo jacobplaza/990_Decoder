@@ -1,4 +1,4 @@
-This project is an edited and expanded version of [Bill Fitzgerlad's get-the-990](https://github.com/billfitzgerald/get_the_990/tree/main). I added in the creation of financial ratios, year-to-year financial comparisons, and created a simple graphical user interface to load in a csv with XML links and choose the output destination of the parsed files.
+This project is an edited and expanded version of [Bill Fitzgerald's Get-the-990](https://github.com/billfitzgerald/get_the_990/tree/main). I added in the creation of financial ratios, year-to-year financial comparisons, and created a simple graphical user interface to load in a csv with XML links and choose the output destination of the parsed files.
 
 It has been tested and works on both MacOS and Windows. 
 I will be adding features and expanding on this tool as I use it for research.
