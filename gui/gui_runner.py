@@ -7,27 +7,69 @@ class GUI:
     def __init__(self, master):
         self.master = master
         master.title("Form 990 Parser")
-        master.configure(bg="#228B22")  # Forest green background
+        master.configure(bg="#f2f2f2")  # Light gray background
         master.geometry("700x500")
+        master.resizable(False, False)
 
         # Fonts
         btn_font = font.Font(family="Arial", size=12, weight="bold")
         log_font = font.Font(family="Courier", size=10)
 
         # Buttons
-        self.btn_browse = tk.Button(master, text="Browse CSV", command=self.browse_csv, font=btn_font, bg="#006400", fg="white")
-        self.btn_browse.pack(pady=10)
+        self.btn_browse = tk.Button(
+            master,
+            text="Browse CSV",
+            command=self.browse_csv,
+            font=btn_font,
+            bg="#4a90e2",
+            fg="white",
+            activebackground="#357ABD",
+            relief="flat",
+            padx=10,
+            pady=5
+        )
+        self.btn_browse.pack(pady=(15, 5))
 
-        self.btn_select_folder = tk.Button(master, text="Select Destination Folder", command=self.select_folder, font=btn_font, bg="#006400", fg="white")
-        self.btn_select_folder.pack(pady=10)
+        self.btn_select_folder = tk.Button(
+            master,
+            text="Select Destination Folder",
+            command=self.select_folder,
+            font=btn_font,
+            bg="#4a90e2",
+            fg="white",
+            activebackground="#357ABD",
+            relief="flat",
+            padx=10,
+            pady=5
+        )
+        self.btn_select_folder.pack(pady=5)
 
-        self.btn_run = tk.Button(master, text="Run Parser", command=self.run_parser_thread, font=btn_font, bg="#006400", fg="white")
-        self.btn_run.pack(pady=10)
+        self.btn_run = tk.Button(
+            master,
+            text="Run Parser",
+            command=self.run_parser_thread,
+            font=btn_font,
+            bg="#4a90e2",
+            fg="white",
+            activebackground="#357ABD",
+            relief="flat",
+            padx=10,
+            pady=5
+        )
+        self.btn_run.pack(pady=(5, 15))
 
         # Log box
-        self.log = scrolledtext.ScrolledText(master, width=80, height=15, font=log_font)
+        self.log = scrolledtext.ScrolledText(
+            master,
+            width=80,
+            height=15,
+            font=log_font,
+            bg="white",
+            fg="#333333",
+            insertbackground="#333333",
+            state='disabled'
+        )
         self.log.pack(pady=10)
-        self.log.configure(bg="#006400", fg="white", insertbackground="white", state='disabled')
 
         # Initialize paths
         self.source_csv = ""
@@ -35,7 +77,9 @@ class GUI:
 
     # --- Functions ---
     def browse_csv(self):
-        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        file_path = filedialog.askopenfilename(
+            filetypes=[("CSV files", "*.csv")]
+        )
         if file_path:
             self.source_csv = file_path
             self.log_message(f"Selected CSV: {file_path}")
@@ -51,7 +95,7 @@ class GUI:
         if not self.source_csv or not self.results_dir:
             self.log_message("Please select CSV and destination folder first.")
             return
-        t = threading.Thread(target=self.run_parser)
+        t = threading.Thread(target=self.run_parser, daemon=True)
         t.start()
 
     def run_parser(self):
