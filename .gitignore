@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+# directories to ignore
+__pycache__/
+results/
+data/
+
+
+# files to ignore
+geckodriver.log
+.DS_Store
+orgs.csv
+people.csv
+test.html
+data_source.csv
