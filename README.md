@@ -1,3 +1,5 @@
+Project is an edited version of the jsfen's 990-xml-reader. I added in the creation of financial ratios, and created a simple graphical user interface. 
+
 # 1. Summarize data from Form 990s
 
 Parse and summarize data from ProPublica's NonProfit Explorer at https://projects.propublica.org/nonprofits/
