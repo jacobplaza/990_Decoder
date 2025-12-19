@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Make sure parser/ and utilities/ are importable
+      # Ensure local packages (parser/, utilities/) are discoverable
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
@@ -33,16 +33,16 @@ jobs:
           pip install -r gui/requirements.txt
           pip install pyinstaller
 
-      # Force bash so the same script works on Windows, Linux, macOS
+      # Force bash so logic works on Windows too
       - name: Build executable
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             echo "Building macOS .app bundle"
-            pyinstaller --windowed --name 990_Decoder gui/gui_runner.py
+            pyinstaller --windowed --paths . --name 990_Decoder gui/gui_runner.py
           else
             echo "Building single-file executable"
-            pyinstaller --onefile --noconsole --name 990_Decoder gui/gui_runner.py
+            pyinstaller --onefile --noconsole --paths . --name 990_Decoder gui/gui_runner.py
           fi
 
       - name: Upload artifact
