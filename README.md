@@ -1,4 +1,4 @@
-Project is an edited version of the jsfen's 990-xml-reader. I added in the creation of financial ratios, and created a simple graphical user interface. 
+This project is an edited version of [Bill Fitzgerlad's get-the-990](https://github.com/billfitzgerald/get_the_990/tree/main). I added in the creation of financial ratios, year-to-year financial comparisons, and created a simple graphical user interface to load in a csv with XML links and choose the output destination of the parsed files.
 
 # 1. Summarize data from Form 990s
 
