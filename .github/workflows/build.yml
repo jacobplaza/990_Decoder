@@ -23,10 +23,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Ensure repo root is on PYTHONPATH so parser/ and utilities/ import correctly
+      # Make sure parser/ and utilities/ are importable
       - name: Set PYTHONPATH
-        run: |
-          echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
@@ -34,13 +33,17 @@ jobs:
           pip install -r gui/requirements.txt
           pip install pyinstaller
 
+      # Force bash so the same script works on Windows, Linux, macOS
       - name: Build executable
+        shell: bash
         run: |
-          pyinstaller \
-            --onefile \
-            --noconsole \
-            --name 990_Decoder \
-            gui/gui_runner.py
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "Building macOS .app bundle"
+            pyinstaller --windowed --name 990_Decoder gui/gui_runner.py
+          else
+            echo "Building single-file executable"
+            pyinstaller --onefile --noconsole --name 990_Decoder gui/gui_runner.py
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
