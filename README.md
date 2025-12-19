@@ -3,6 +3,8 @@ This project is an edited and expanded version of [Bill Fitzgerald's Get-the-990
 It has been tested and works on both MacOS and Windows. 
 I will be adding features and expanding on this tool as I use it for research.
 
+From Bill's original ReadMe:
+
 # 1. Summarize data from Form 990s
 
 Parse and summarize data from ProPublica's NonProfit Explorer at https://projects.propublica.org/nonprofits/
@@ -29,4 +31,4 @@ Pull requests are welcome, as are issues and questions.
 
 # 5. Technical Details
 
-**Get the 990** requires Python 3.6 or higher, and it was developed on Linux. It has not been tested on OSX or Windows. 
+**Get the 990** requires Python 3.6 or higher.
