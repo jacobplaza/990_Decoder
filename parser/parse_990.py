@@ -6,6 +6,21 @@ from bs4 import BeautifulSoup
 from utilities.helpers import prep_request, makedirs, write_file
 
 
+def safe_text(parent, tag, default=""):
+    el = parent.find(tag)
+    if el is None or el.text is None:
+        return default
+    return el.text.strip()
+
+
+def safe_int(parent, tag):
+    val = safe_text(parent, tag)
+    try:
+        return int(val)
+    except:
+        return 0
+
+
 def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Yes"):
     """
     Parse Form 990 XML files listed in a source CSV and generate:
@@ -14,15 +29,6 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
         - financial.csv
         - financial_changes.csv
         - HTML summary
-
-    Parameters:
-        source_csv_path (str): Path to CSV containing 'source' column with XML URLs
-        results_dir (str): Folder to save CSVs and HTML
-        show_board (str): "Yes" to include board info in HTML
-        show_staff (str): "Yes" to include staff info in HTML
-
-    Returns:
-        dict: Paths to generated CSVs and HTML summary
     """
 
     makedirs(results_dir)
@@ -56,12 +62,6 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
         'program_expense_ratio'
     ])
 
-    def str_to_int(conv, na):
-        try:
-            return int(conv)
-        except:
-            return 0 if na == "number" else "na"
-
     # --- Read source CSV ---
     df_source = pd.read_csv(source_csv_path)
     source_urls = df_source.source.unique()
@@ -71,29 +71,39 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
         response = r.get(su, timeout=90)
         soup = BeautifulSoup(response.content, 'xml')
 
+        # Guard against bad downloads
+        if not soup.find('Return'):
+            print(f"Skipping invalid XML: {su}")
+            continue
+
         filer = soup.find('Filer')
-        ein = filer.find('EIN').text
-        org_name = filer.find('BusinessName').text.strip().title()
-        year = int(soup.find('TaxYr').text.strip())
-        org_id = re.sub('[^a-zA-Z0-9]', '', f'{org_name}_{year}'.replace(' ', '_').lower())
+        ein = safe_text(filer, 'EIN')
+        org_name = safe_text(filer, 'BusinessName').title()
+        year = int(safe_text(soup, 'TaxYr', 0))
+
+        org_id = re.sub(
+            '[^a-zA-Z0-9]',
+            '',
+            f'{org_name}_{year}'.replace(' ', '_').lower()
+        )
 
         # --- Financial / org info ---
-        voting_members = str_to_int(soup.find('VotingMembersGoverningBodyCnt').text.strip(), "number")
-        employees = str_to_int(soup.find('TotalEmployeeCnt').text.strip(), "number")
-        total_revenue = str_to_int(soup.find('CYTotalRevenueAmt').text.strip(), "number")
-        salaries = str_to_int(soup.find('CYSalariesCompEmpBnftPaidAmt').text.strip(), "number")
-        total_expenses = str_to_int(soup.find('CYTotalExpensesAmt').text.strip(), "number")
-        rev_minus_exp = str_to_int(soup.find('CYRevenuesLessExpensesAmt').text.strip(), "number")
-        assets = str_to_int(soup.find('NetAssetsOrFundBalancesEOYAmt').text.strip(), "number")
+        voting_members = safe_int(soup, 'VotingMembersGoverningBodyCnt')
+        employees = safe_int(soup, 'TotalEmployeeCnt')
+        total_revenue = safe_int(soup, 'CYTotalRevenueAmt')
+        salaries = safe_int(soup, 'CYSalariesCompEmpBnftPaidAmt')
+        total_expenses = safe_int(soup, 'CYTotalExpensesAmt')
+        rev_minus_exp = safe_int(soup, 'CYRevenuesLessExpensesAmt')
+        assets = safe_int(soup, 'NetAssetsOrFundBalancesEOYAmt')
 
-        liab_tag = soup.find('TotalLiabilitiesEOYAmt')
-        liabilities = str_to_int(liab_tag.text.strip(), "number") if liab_tag else 0
+        liabilities = safe_int(soup, 'TotalLiabilitiesEOYAmt')
 
-        unr_tag = soup.find('NoDonorRestrictionNetAssetsGrp')
-        unrestricted_net_assets = str_to_int(unr_tag.find('EOYAmt').text.strip(), "number") if unr_tag and unr_tag.find('EOYAmt') else 0
+        unr_grp = soup.find('NoDonorRestrictionNetAssetsGrp')
+        unrestricted_net_assets = (
+            safe_int(unr_grp, 'EOYAmt') if unr_grp else 0
+        )
 
-        prog_tag = soup.find('TotalProgramServiceExpensesAmt')
-        program_expenses = str_to_int(prog_tag.text.strip(), "number") if prog_tag else 0
+        program_expenses = safe_int(soup, 'TotalProgramServiceExpensesAmt')
 
         print(f'Processing data from {org_name} for {year}')
 
@@ -108,11 +118,12 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
         comp_list = []
 
         for x in soup.find_all('Form990PartVIISectionAGrp'):
-            name = x.find('PersonNm').text.strip().title()
-            job_title = x.find('TitleTxt').text.strip().title()
-            comp = str_to_int(x.find('ReportableCompFromOrgAmt').text.strip(), "number")
-            reportable_comp = str_to_int(x.find('ReportableCompFromRltdOrgAmt').text.strip(), "number")
-            other_comp = str_to_int(x.find('OtherCompensationAmt').text.strip(), "number")
+            name = safe_text(x, 'PersonNm', 'Unknown').title()
+            job_title = safe_text(x, 'TitleTxt', 'Unknown').title()
+
+            comp = safe_int(x, 'ReportableCompFromOrgAmt')
+            reportable_comp = safe_int(x, 'ReportableCompFromRltdOrgAmt')
+            other_comp = safe_int(x, 'OtherCompensationAmt')
             total_comp = comp + reportable_comp + other_comp
             comp_list.append(total_comp)
 
@@ -131,11 +142,13 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
         # ---- Highest compensation ----
         comp_list.sort(reverse=True)
         high = comp_list[0] if comp_list else 0
+
         df_highest = df_people[
             (df_people['total_comp'] == high) &
             (df_people['year'] == year) &
             (df_people['org_name'] == org_name)
         ]
+
         highest_comp_name = df_highest['name'].iloc[0] if not df_highest.empty else "NA"
         highest_comp_title = df_highest['job_title'].iloc[0] if not df_highest.empty else "NA"
 
@@ -145,6 +158,7 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
             voting_members, employees,
             highest_comp_name, highest_comp_title, high
         ]
+
         df_financial.loc[len(df_financial)] = [
             org_id, ein, org_name, year,
             employees,
@@ -176,17 +190,17 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
     # ---- Multi-year financial changes ----
     change_rows = []
     df_financial_sorted = df_financial.sort_values(['org_name', 'year'])
+
+    def pct_change(curr, prev):
+        if prev in [0, None] or curr is None:
+            return 0
+        return ((curr - prev) / prev) * 100
+
     for org, g in df_financial_sorted.groupby('org_name'):
         g = g.sort_values('year')
         first = g.iloc[0]
         last = g.iloc[-1]
 
-        def pct_change(curr, prev):
-            if prev in [0, None] or curr is None:
-                return 0
-            return ((curr - prev) / prev) * 100
-
-        # overall change
         change_rows.append({
             'org_name': org,
             'start_year': first['year'],
@@ -203,7 +217,6 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
             'current_ratio_change_pct': pct_change(last['current_ratio'], first['current_ratio'])
         })
 
-        # year-to-year changes
         for i in range(1, len(g)):
             prev = g.iloc[i - 1]
             curr = g.iloc[i]
@@ -237,7 +250,6 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
 
     write_file(html_filename, doc_intro + doc_body)
     webbrowser.open(html_filename)
-    print(f"HTML summary opened in browser at {html_filename}")
 
     return {
         "people_csv": people_csv,
@@ -249,4 +261,7 @@ def run_990_parser(source_csv_path, results_dir, show_board="Yes", show_staff="Y
 
 
 if __name__ == "__main__":
-    run_990_parser(source_csv_path='data/data_source.csv', results_dir='results')
+    run_990_parser(
+        source_csv_path='data/data_source.csv',
+        results_dir='results'
+    )
