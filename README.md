@@ -3,6 +3,16 @@ This project is an edited and expanded version of [Bill Fitzgerald's Get-the-990
 It has been tested and works on both MacOS and Windows. 
 I will be adding features and expanding on this tool as I use it for research.
 
+# How to use 990 Decoder: 
+
+1. Download the latest release from the "release" page on GitHub.
+2. After unzipping the file on Mac or downloading the .exe on Windows, you can open the program.
+   NOTE: On Mac, the program may get flagged as a security risk, since it was downloaded from the internet. You will need to go to Settings-> Privacy & Security, and scroll down. There, you will see the 990 Decoder flagged and an option to "open anyway".
+4. The 990 Decoder accepts a .csv file of links to ProPublica's .xml 990 forms. Go to ProPublica's Non-Profit explorer page, find your Non-Profit, and for every year's 990 form, right-click the button that says "XML", hit "Copy Link". Paste it into a .csv file. As of v1.0.01, the first line of the .csv file NEEDS to just say "source," otherwise the decoder will return an error code. Every following line should be a link to the .xml file. You can compile these links in Excel or Google sheets, just make sure to save/export the file as a .csv, and not .xlsx. 
+5. Select a destination folder. This is where the parsed data will be returned. 
+6. Hit "Run parser"
+7. Wherever you specified the output file, there will be an overview HTML file, one for basic financial calculations, one that summarizes people associated with the organization, and, importantly, one that automatically computes year-to-year financial ratios for the nonprofit. In the financial ratio output document, there will also be a row that computes ratios between the earliest 990 you included and the most recent one. For example, if I upload 990 forms for every year between 2018 and 2024, then there will be a row that computes financial ratios between the data in the 2018 990, and the 2024 990. So keep that in mind in case you want to compute a specific range! 
+
 From Bill's original ReadMe:
 
 # 1. Summarize data from Form 990s
