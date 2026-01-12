@@ -13,6 +13,8 @@ I will be adding features and expanding on this tool as I use it for research.
 6. Hit "Run parser"
 7. Wherever you specified the output file, there will be an overview HTML file, one for basic financial calculations, one that summarizes people associated with the organization, and, importantly, one that automatically computes year-to-year financial ratios for the nonprofit. In the financial ratio output document, there will also be a row that computes ratios between the earliest 990 you included and the most recent one. For example, if I upload 990 forms for every year between 2018 and 2024, then there will be a row that computes financial ratios between the data in the 2018 990, and the 2024 990. So keep that in mind in case you want to compute a specific range! 
 
+Of course, if you are using this tool for any kind of decision making, you should double-check the calculations yourself. This is a tool mainly intended to reduce the amount of menial labor involved with flipping through different .pdfs so that power researchers can focus their time and energy on more important questions.
+
 From Bill's original ReadMe:
 
 # 1. Summarize data from Form 990s
