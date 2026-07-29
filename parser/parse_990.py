@@ -5,7 +5,17 @@ import html
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from utilities.helpers import makedirs, write_file
+
+
+def makedirs(directory):
+    """Create an output directory if it does not already exist."""
+    os.makedirs(directory, exist_ok=True)
+
+
+def write_file(filename, content):
+    """Write UTF-8 text output."""
+    with open(filename, "w", encoding="utf-8") as output_file:
+        output_file.write(content)
 
 
 def safe_text(parent, tag, default=""):
