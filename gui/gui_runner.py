@@ -3,7 +3,6 @@ from tkinter import filedialog, scrolledtext
 import threading
 import os
 
-from parser.parse_990 import run_990_parser
 
 
 class GUI:
@@ -276,6 +275,11 @@ class GUI:
         )
 
         try:
+
+            # Import the heavy parser only after the window is visible and
+            # the user clicks Run Parser. This keeps application startup fast
+            # and allows import errors to appear in the GUI log.
+            from parser.parse_990 import run_990_parser
 
             outputs = run_990_parser(
                 xml_dir=self.xml_dir,
