@@ -1,6 +1,7 @@
 import os
 import re
 import webbrowser
+import html
 import pandas as pd
 from bs4 import BeautifulSoup
 
@@ -34,6 +35,53 @@ def safe_int(parent, tag):
         return int(val)
     except (ValueError, TypeError):
         return 0
+
+
+def format_category_name(tag_name):
+    """Convert an IRS XML group tag into a readable category label."""
+    name = re.sub(r"Grp$", "", tag_name or "")
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    replacements = {
+        "Comp Current Ofcr Directors": "Compensation of Current Officers and Directors",
+        "Other Salaries And Wages": "Other Salaries and Wages",
+        "Pension Plan Contributions": "Pension Plan Contributions",
+        "Other Employee Benefits": "Other Employee Benefits",
+        "Payroll Taxes": "Payroll Taxes",
+        "Fees For Services Legal": "Legal Fees",
+        "Fees For Services Accounting": "Accounting Fees",
+        "Fees For Services Lobbying": "Lobbying Fees",
+        "Fees For Services Prof Fundraising": "Professional Fundraising Fees",
+        "Fees For Services Invst Mgt": "Investment Management Fees",
+        "Fees For Services Other": "Other Professional Service Fees",
+        "Advertising Promotion": "Advertising and Promotion",
+        "Office Expenses": "Office Expenses",
+        "Information Technology": "Information Technology",
+        "Royalties": "Royalties",
+        "Occupancy": "Occupancy",
+        "Travel": "Travel",
+        "Travel Entertainment Public Ofcl": "Travel or Entertainment for Public Officials",
+        "Conferences Meetings": "Conferences and Meetings",
+        "Interest": "Interest",
+        "Payments To Affiliates": "Payments to Affiliates",
+        "Depreciation Depletion": "Depreciation and Depletion",
+        "Insurance": "Insurance",
+        "All Other Expenses": "All Other Expenses",
+    }
+    return replacements.get(name, name)
+
+
+def html_table(headers, rows):
+    """Build a small escaped HTML table for the summary report."""
+    if not rows:
+        return '<p class="muted">No detail was reported.</p>'
+
+    head = "".join(f"<th>{html.escape(str(h))}</th>" for h in headers)
+    body = ""
+    for row in rows:
+        body += "<tr>" + "".join(
+            f"<td>{html.escape(str(value))}</td>" for value in row
+        ) + "</tr>"
+    return f'<div class="table-wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
 def find_xml_files(xml_dir):
@@ -93,6 +141,8 @@ def run_990_parser(
         - orgs.csv
         - financial.csv
         - financial_changes.csv
+        - expense_detail.csv
+        - revenue_detail.csv
         - summary.html
         - processing_errors.csv (only if errors occur)
 
@@ -143,6 +193,16 @@ def run_990_parser(
     financial_changes_csv = os.path.join(
         results_dir,
         "financial_changes.csv"
+    )
+
+    expense_detail_csv = os.path.join(
+        results_dir,
+        "expense_detail.csv"
+    )
+
+    revenue_detail_csv = os.path.join(
+        results_dir,
+        "revenue_detail.csv"
     )
 
     errors_csv = os.path.join(
@@ -225,6 +285,23 @@ def run_990_parser(
             "savings_indicator_ratio",
             "operating_margin",
             "program_expense_ratio"
+        ]
+    )
+
+    df_expense_detail = pd.DataFrame(
+        columns=[
+            "org_id", "ein", "org_name", "year", "expense_category",
+            "total_amount", "program_services_amount",
+            "management_general_amount", "fundraising_amount",
+            "share_of_total_expenses", "program_services_share"
+        ]
+    )
+
+    df_revenue_detail = pd.DataFrame(
+        columns=[
+            "org_id", "ein", "org_name", "year", "category_level",
+            "revenue_category", "business_code", "amount",
+            "share_of_total_revenue"
         ]
     )
 
@@ -470,6 +547,128 @@ def run_990_parser(
             )
 
             # -------------------------------------------------
+            # Detailed revenue and expense categories
+            # -------------------------------------------------
+
+            irs990 = soup.find("IRS990")
+            current_expense_rows = []
+            current_revenue_rows = []
+
+            # Broad Part VIII revenue categories.
+            broad_revenue_tags = [
+                ("Contributions and Grants", "CYContributionsGrantsAmt"),
+                ("Program Service Revenue", "CYProgramServiceRevenueAmt"),
+                ("Investment Income", "CYInvestmentIncomeAmt"),
+                ("Other Revenue", "CYOtherRevenueAmt"),
+            ]
+
+            for revenue_category, revenue_tag in broad_revenue_tags:
+                amount = safe_int(irs990, revenue_tag)
+                share = amount / total_revenue if total_revenue else 0
+                row = {
+                    "org_id": org_id,
+                    "ein": ein,
+                    "org_name": org_name,
+                    "year": year,
+                    "category_level": "broad_source",
+                    "revenue_category": revenue_category,
+                    "business_code": "",
+                    "amount": amount,
+                    "share_of_total_revenue": share,
+                }
+                current_revenue_rows.append(row)
+                df_revenue_detail.loc[len(df_revenue_detail)] = row
+
+            # Named Part VIII program-service revenue sources.
+            if irs990 is not None:
+                for revenue_group in irs990.find_all(
+                    "ProgramServiceRevenueGrp",
+                    recursive=False
+                ):
+                    revenue_category = safe_text(
+                        revenue_group,
+                        "Desc",
+                        "Unnamed Program Service Revenue"
+                    )
+                    amount = safe_int(revenue_group, "TotalRevenueColumnAmt")
+                    business_code = safe_text(revenue_group, "BusinessCd")
+                    share = amount / total_revenue if total_revenue else 0
+                    row = {
+                        "org_id": org_id,
+                        "ein": ein,
+                        "org_name": org_name,
+                        "year": year,
+                        "category_level": "program_service",
+                        "revenue_category": revenue_category,
+                        "business_code": business_code,
+                        "amount": amount,
+                        "share_of_total_revenue": share,
+                    }
+                    current_revenue_rows.append(row)
+                    df_revenue_detail.loc[len(df_revenue_detail)] = row
+
+            # Part IX functional-expense groups. Each group may report
+            # total, program-service, management/general, and fundraising.
+            if irs990 is not None:
+                expense_groups = []
+                for child in irs990.find_all(recursive=False):
+                    if child.name == "OtherExpensesGrp":
+                        expense_groups.append(child)
+                    elif (
+                        child.name
+                        and child.name.endswith("Grp")
+                        and child.find("TotalAmt", recursive=False) is not None
+                        and (
+                            child.find("ProgramServicesAmt", recursive=False) is not None
+                            or child.find("ManagementAndGeneralAmt", recursive=False) is not None
+                            or child.find("FundraisingAmt", recursive=False) is not None
+                        )
+                        and child.name not in {
+                            "TotalFunctionalExpensesGrp",
+                            "TotalRevenueGrp",
+                        }
+                    ):
+                        expense_groups.append(child)
+
+                for expense_group in expense_groups:
+                    if expense_group.name == "OtherExpensesGrp":
+                        expense_category = safe_text(
+                            expense_group,
+                            "Desc",
+                            "Other Expense"
+                        )
+                    else:
+                        expense_category = format_category_name(expense_group.name)
+
+                    total_amount = safe_int(expense_group, "TotalAmt")
+                    program_amount = safe_int(expense_group, "ProgramServicesAmt")
+                    management_amount = safe_int(
+                        expense_group,
+                        "ManagementAndGeneralAmt"
+                    )
+                    fundraising_amount = safe_int(expense_group, "FundraisingAmt")
+                    share = total_amount / total_expenses if total_expenses else 0
+                    program_share = (
+                        program_amount / total_amount if total_amount else 0
+                    )
+
+                    row = {
+                        "org_id": org_id,
+                        "ein": ein,
+                        "org_name": org_name,
+                        "year": year,
+                        "expense_category": expense_category,
+                        "total_amount": total_amount,
+                        "program_services_amount": program_amount,
+                        "management_general_amount": management_amount,
+                        "fundraising_amount": fundraising_amount,
+                        "share_of_total_expenses": share,
+                        "program_services_share": program_share,
+                    }
+                    current_expense_rows.append(row)
+                    df_expense_detail.loc[len(df_expense_detail)] = row
+
+            # -------------------------------------------------
             # People & compensation
             # -------------------------------------------------
 
@@ -631,6 +830,68 @@ def run_990_parser(
             # -------------------------------------------------
             # HTML summary per organization
             # -------------------------------------------------
+
+            top_expenses = sorted(
+                current_expense_rows,
+                key=lambda row: row["total_amount"],
+                reverse=True
+            )[:10]
+            top_revenue_sources = sorted(
+                [
+                    row for row in current_revenue_rows
+                    if row["category_level"] == "broad_source"
+                ],
+                key=lambda row: row["amount"],
+                reverse=True
+            )
+            top_program_revenue = sorted(
+                [
+                    row for row in current_revenue_rows
+                    if row["category_level"] == "program_service"
+                ],
+                key=lambda row: row["amount"],
+                reverse=True
+            )[:10]
+
+            expense_table = html_table(
+                ["Expense category", "Total", "% of expenses", "Program", "Management", "Fundraising"],
+                [
+                    [
+                        row["expense_category"],
+                        f'${row["total_amount"]:,}',
+                        f'{row["share_of_total_expenses"]:.1%}',
+                        f'${row["program_services_amount"]:,}',
+                        f'${row["management_general_amount"]:,}',
+                        f'${row["fundraising_amount"]:,}',
+                    ]
+                    for row in top_expenses
+                ]
+            )
+
+            revenue_table = html_table(
+                ["Revenue source", "Amount", "% of revenue"],
+                [
+                    [
+                        row["revenue_category"],
+                        f'${row["amount"]:,}',
+                        f'{row["share_of_total_revenue"]:.1%}',
+                    ]
+                    for row in top_revenue_sources
+                ]
+            )
+
+            program_revenue_table = html_table(
+                ["Program revenue source", "Amount", "% of revenue"],
+                [
+                    [
+                        row["revenue_category"],
+                        f'${row["amount"]:,}',
+                        f'{row["share_of_total_revenue"]:.1%}',
+                    ]
+                    for row in top_program_revenue
+                ]
+            )
+
             summary_text = f"""
             <section class="organization-card" id="{org_id}">
                 <h2>{org_name} - {year}</h2>
@@ -663,6 +924,15 @@ def run_990_parser(
                     <li><b>Operating Margin:</b> {operating_margin:.1%}</li>
                     <li><b>Program Expense Ratio:</b> {program_expense_ratio:.1%}</li>
                 </ul>
+
+                <h3>Largest Expense Categories</h3>
+                {expense_table}
+
+                <h3>Revenue Sources</h3>
+                {revenue_table}
+
+                <h3>Program Service Revenue Sources</h3>
+                {program_revenue_table}
 
                 <h3>Compensation Overview</h3>
                 <ul>
@@ -781,6 +1051,19 @@ def run_990_parser(
     report(
         f"Saved financial.csv to {financial_csv}"
     )
+
+    df_expense_detail.sort_values(
+        ["org_name", "year", "total_amount"],
+        ascending=[True, False, False]
+    ).to_csv(expense_detail_csv, index=False)
+
+    df_revenue_detail.sort_values(
+        ["org_name", "year", "category_level", "amount"],
+        ascending=[True, False, True, False]
+    ).to_csv(revenue_detail_csv, index=False)
+
+    report(f"Saved expense_detail.csv to {expense_detail_csv}")
+    report(f"Saved revenue_detail.csv to {revenue_detail_csv}")
 
     # ---------------------------------------------------------
     # Multi-year financial changes
@@ -1039,6 +1322,38 @@ def run_990_parser(
             a:hover {
                 text-decoration: underline;
             }
+
+            .table-wrap {
+                overflow-x: auto;
+                margin-bottom: 18px;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.92rem;
+            }
+
+            th, td {
+                border: 1px solid #d1d5db;
+                padding: 8px 10px;
+                text-align: right;
+                white-space: nowrap;
+            }
+
+            th:first-child, td:first-child {
+                text-align: left;
+                white-space: normal;
+            }
+
+            th {
+                background: #f3f4f6;
+            }
+
+            .muted {
+                color: #6b7280;
+                font-style: italic;
+            }
         </style>
     </head>
     <body>
@@ -1155,6 +1470,12 @@ def run_990_parser(
 
         "financial_changes_csv":
             financial_changes_csv,
+
+        "expense_detail_csv":
+            expense_detail_csv,
+
+        "revenue_detail_csv":
+            revenue_detail_csv,
 
         "html_summary":
             html_filename
