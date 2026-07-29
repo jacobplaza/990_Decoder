@@ -28,12 +28,6 @@ def safe_text(parent, tag, default=""):
 
 
 def safe_int(parent, tag):
-    """
-    Safely retrieve an integer from an XML tag.
-
-    Returns 0 if the tag is missing or cannot be
-    converted to an integer.
-    """
     val = safe_text(parent, tag)
 
     try:
@@ -43,15 +37,6 @@ def safe_int(parent, tag):
 
 
 def find_xml_files(xml_dir):
-    """
-    Find all XML files in the selected directory.
-
-    Only files in the selected directory itself are included.
-    Subdirectories are not searched.
-
-    Returns:
-        A sorted list of full XML file paths.
-    """
 
     if not os.path.isdir(xml_dir):
         raise ValueError(
@@ -646,15 +631,46 @@ def run_990_parser(
             # -------------------------------------------------
             # HTML summary per organization
             # -------------------------------------------------
-
             summary_text = f"""
-            <h2 id="{org_id}">{org_name} - {year}</h2>
-            <ul>
-                <li><b>Employees</b>: {employees}</li>
-                <li><b>Total Revenue</b>: ${total_revenue:,}</li>
-                <li><b>Total Expenses</b>: ${total_expenses:,}</li>
-                <li><b>Assets</b>: ${assets:,}</li>
-            </ul>
+            <section class="organization-card" id="{org_id}">
+                <h2>{org_name} - {year}</h2>
+
+                <h3>Organization Overview</h3>
+                <ul>
+                    <li><b>Tax Year:</b> {year}</li>
+                    <li><b>EIN:</b> {ein}</li>
+                    <li><b>Voting Members:</b> {voting_members:,}</li>
+                    <li><b>Employees:</b> {employees:,}</li>
+                </ul>
+
+                <h3>Financial Overview</h3>
+                <ul>
+                    <li><b>Total Revenue:</b> ${total_revenue:,}</li>
+                    <li><b>Total Expenses:</b> ${total_expenses:,}</li>
+                    <li><b>Revenue Less Expenses:</b> ${rev_minus_exp:,}</li>
+                    <li><b>Salaries and Employee Benefits:</b> ${salaries:,}</li>
+                    <li><b>Program Service Expenses:</b> ${program_expenses:,}</li>
+                    <li><b>Total Assets:</b> ${assets:,}</li>
+                    <li><b>Total Liabilities:</b> ${liabilities:,}</li>
+                    <li><b>Unrestricted Net Assets:</b> ${unrestricted_net_assets:,}</li>
+                </ul>
+
+                <h3>Financial Ratios</h3>
+                <ul>
+                    <li><b>Current Ratio:</b> {current_ratio:.3f}</li>
+                    <li><b>Debt Ratio:</b> {debt_ratio:.3f}</li>
+                    <li><b>Savings Indicator Ratio:</b> {savings_indicator_ratio:.1%}</li>
+                    <li><b>Operating Margin:</b> {operating_margin:.1%}</li>
+                    <li><b>Program Expense Ratio:</b> {program_expense_ratio:.1%}</li>
+                </ul>
+
+                <h3>Compensation Overview</h3>
+                <ul>
+                    <li><b>Highest-Paid Person:</b> {highest_comp_name}</li>
+                    <li><b>Title:</b> {highest_comp_title}</li>
+                    <li><b>Total Compensation:</b> ${high:,}</li>
+                </ul>
+            </section>
             """
 
             df_report.loc[
@@ -969,10 +985,68 @@ def run_990_parser(
     # HTML summary
     # ---------------------------------------------------------
 
-    doc_intro = (
-        "<h2>Summary of Form 990s</h2>"
-        "<ul>"
-    )
+    doc_intro = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Form 990 Summary</title>
+        <style>
+            body {
+                font-family: Arial, Helvetica, sans-serif;
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 24px;
+                line-height: 1.5;
+                color: #222;
+                background: #f5f5f5;
+            }
+
+            h1, h2, h3 {
+                color: #1f2937;
+            }
+
+            .report-header,
+            .organization-card {
+                background: #ffffff;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 24px;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+            }
+
+            .organization-card h2 {
+                margin-top: 0;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #e5e7eb;
+            }
+
+            ul {
+                padding-left: 24px;
+            }
+
+            li {
+                margin-bottom: 6px;
+            }
+
+            a {
+                color: #1d4ed8;
+                text-decoration: none;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <body>
+    <div class="report-header">
+        <h1>Summary of Form 990s</h1>
+        <h2>Organizations and Tax Years</h2>
+        <ul>
+    """
 
     doc_body = ""
 
@@ -999,13 +1073,18 @@ def run_990_parser(
                 ].iloc[0]
             )
 
-        doc_body += "<hr>"
+        doc_body += ""
 
-    doc_intro += "</ul>"
+    doc_intro += "</ul></div>"
+
+    doc_footer = """
+    </body>
+    </html>
+    """
 
     write_file(
         html_filename,
-        doc_intro + doc_body
+        doc_intro + doc_body + doc_footer
     )
 
     report(
